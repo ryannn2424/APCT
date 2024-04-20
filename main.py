@@ -2,6 +2,7 @@ import customtkinter as ctk
 from customtkinter import filedialog
 from PIL import Image
 import datetime
+import os
 
 class MainApp(ctk.CTk):
     def __init__(self, **kwargs):
@@ -12,23 +13,73 @@ class MainApp(ctk.CTk):
 
         self.columnconfigure(0, weight=1)
 
-        self.TopBar(self).grid(row=0, column=0, sticky="news")
-        self.NoteCell(self, name="Note1").grid(row=1, column=0, sticky="news", pady=2)
-        self.NoteCell(self, name="Note2").grid(row=2, column=0, sticky="news", pady=2)
-        self.NoteCell(self, name="Note3").grid(row=3, column=0, sticky="news", pady=2)
+        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=100)
+        self.rowconfigure(2, weight=1)
+
+        noteContainer= self.NoteContainer(self, cellClassRef=self.NoteCell)
+        noteContainer.grid(row=1, column=0, sticky="news")
+
+
+        self.TopBar(self, noteContainer).grid(row=0, column=0, sticky="news")
+
+        buttonFrame = ctk.CTkFrame(self, fg_color="transparent")
+        buttonFrame.grid(row=2, column=0, sticky="news")
+        buttonFrame.columnconfigure(0, weight=1)
+        buttonFrame.columnconfigure(1, weight=1)
+
+        ctk.CTkButton(buttonFrame, text="Edit Selected Note").grid(column=0, row=0, sticky="news", padx=2)
+        ctk.CTkButton(buttonFrame, text="Settings").grid(column=1, row=0, sticky="news", padx=2)
+
+
+        # self.NoteCell(self, name="Note1").grid(row=1, column=0, sticky="news", pady=2)
+        # self.NoteCell(self, name="Note2").grid(row=2, column=0, sticky="news", pady=2)
+        # self.NoteCell(self, name="Note3").grid(row=3, column=0, sticky="news", pady=2)
 
         self.mainloop()
 
+    class NoteContainer(ctk.CTkFrame):
+        def __init__(self, master, cellClassRef, **kwargs):
+            super().__init__(master, fg_color="transparent", **kwargs)
+
+            self.cellClassRef = cellClassRef
+            self.noteIndex = 0
+            self.selectedCell = None
+            # self.cellList = []
+
+            self.columnconfigure(0, weight=1)
+
+            savedNotesFiles = []
+            for file in os.listdir('./Notes'):
+                if file.endswith(".txt"):
+                    savedNotesFiles.append(file)
+
+            for file in savedNotesFiles:
+                with open(f"Notes/{file}", "r") as noteFile:
+                    name = noteFile.readline().strip()
+                    date = noteFile.readline().strip()
+                    iconPath = noteFile.readline().strip()
+                    self.addCell(name, iconPath, date)
+
+        def addCell(self, name, iconPath, date):
+            newCell = self.cellClassRef(self, name=name, icon=iconPath, date=date)
+            newCell.grid(row=self.noteIndex, column=0, sticky="news", pady=2)
+            # self.cellList.append(newCell)
+            with open(f"Notes/{name}.txt", "w") as noteFile:
+                noteFile.write(f"{name}\n{date}\n{iconPath}\n")
+            self.noteIndex += 1
+
     class TopBar(ctk.CTkFrame):
-        def __init__(self, master, **kwargs):
+        def __init__(self, master, cellContainerRef, **kwargs):
             super().__init__(master, **kwargs)
 
+            self.cellContainerRef = cellContainerRef
 
             self.columnconfigure(0, weight=1)
             self.columnconfigure(1, weight=20)
             self.columnconfigure(2, weight=1)
 
-            currentDate = datetime.datetime.now()
+            self.currentDate = datetime.datetime.now()
 
             NewNoteButton = ctk.CTkLabel(self, text="", font=ctk.CTkFont(family="JetBrainsMono NFM Regular", size=40))
             NewNoteButton.grid(row=0, column=0, sticky="news", padx=5)
@@ -42,22 +93,22 @@ class MainApp(ctk.CTk):
             programTitle = ctk.CTkLabel(nameAndDateFrame, text="Note Taker", font=ctk.CTkFont(family="Arial Bold", size=15))
             programTitle.grid(row=0, column=0)
 
-            currentDateLabel = ctk.CTkLabel(nameAndDateFrame, text=f"{currentDate.strftime("%B")} {currentDate.strftime("%d")}, {currentDate.strftime("%Y")}",  font=ctk.CTkFont(family="Arial", size=10))
-            currentDateLabel.grid(row=1, column=0, sticky="news")
+            self.currentDateLabel = ctk.CTkLabel(nameAndDateFrame, text=f"{self.currentDate.strftime("%B")} {self.currentDate.strftime("%d")}, {self.currentDate.strftime("%Y")}",  font=ctk.CTkFont(family="Arial", size=10))
+            self.currentDateLabel.grid(row=1, column=0, sticky="news")
 
-            editNoteButton = ctk.CTkLabel(self, text="", font=ctk.CTkFont(family="JetBrainsMono NFM Regular", size=40))
+            editNoteButton = ctk.CTkLabel(self, text="", font=ctk.CTkFont(family="JetBrainsMono NFM Regular", size=40))
             editNoteButton.grid(row=0, column=2, sticky="news", padx=5)
 
         def createNewNoteGUI(self):
             popup = ctk.CTkToplevel(self)
             popup.title("Create New Note")
-            popup.geometry("240x130")
+            popup.geometry("300x150")
             
-            selectedImage = "./image-not-found-icon.png"
+            self.selectedImage = "./image-not-found-icon.png"
 
             popup.columnconfigure(0, weight=1)
             # popup.columnconfigure(1, weight=4)
-            popup.rowconfigure(0, weight=1)
+            popup.rowconfigure(0, weight=2)
             popup.rowconfigure(1, weight=1)
 
             containerFrame = ctk.CTkFrame(popup)
@@ -101,21 +152,25 @@ class MainApp(ctk.CTk):
             cancelButton = ctk.CTkButton(buttonFrame, text="Cancel", command=popup.destroy)
             cancelButton.grid(column=0, row=0, sticky="news")
 
-            createButton = ctk.CTkButton(buttonFrame, text="Create Note")
+            createButton = ctk.CTkButton(buttonFrame, text="Create Note", command= lambda: createCell())
             createButton.grid(column=1, row=0, sticky="news")
 
             popup.after(100, popup.lift)
             
             def selectIcon():
-                selectedImage = filedialog.askopenfilename()
-                iconPickerLabel.configure(image=ctk.CTkImage(Image.open(selectedImage), size=(50, 50)))
-                iconPickerLabel.image = ctk.CTkImage(Image.open(selectedImage), size=(50, 50))
+                self.selectedImage = filedialog.askopenfilename()
+                iconPickerLabel.configure(image=ctk.CTkImage(Image.open(self.selectedImage), size=(50, 50)))
+                iconPickerLabel.image = ctk.CTkImage(Image.open(self.selectedImage), size=(50, 50))
                 popup.after(100, popup.lift)
 
-
+            def createCell():
+                if self.selectedImage == "./openFile.png":
+                    self.selectedImage = "./image-not-found-icon.png"
+                self.cellContainerRef.addCell(Entry.get(), self.selectedImage, f"{self.currentDate.strftime("%B")} {self.currentDate.strftime("%d")}, {self.currentDate.strftime("%Y")} - {self.currentDate.strftime('%I')}: {self.currentDate.strftime('%M')} {self.currentDate.strftime('%p')}")
+                popup.destroy()
 
     class NoteCell(ctk.CTkFrame):
-        def __init__(self, master, icon="./image-not-found-icon.png", name="placeholdStr", **kwargs):
+        def __init__(self, master, icon="./image-not-found-icon.png", name="placeholdStr", date="placeholdStr", **kwargs):
             super().__init__(master, **kwargs)
             
             self.columnconfigure(0, weight=1)
@@ -125,24 +180,45 @@ class MainApp(ctk.CTk):
 
             image = ctk.CTkImage(light_image=Image.open(icon), dark_image=Image.open(icon), size=(50, 50))
 
-            IconFrame = ctk.CTkFrame(self, width=70, height=70, fg_color="transparent")
-            IconFrame.grid(column=0, row=0, sticky="news")
-            IconFrame.rowconfigure(0, weight=1)
-            IconFrame.columnconfigure(0, weight=1)
+            self.IconFrame = ctk.CTkFrame(self, width=70, height=70, fg_color="transparent")
+            self.IconFrame.grid(column=0, row=0, sticky="news")
+            self.IconFrame.rowconfigure(0, weight=1)
+            self.IconFrame.columnconfigure(0, weight=1)
 
             iconLabel = ctk.CTkLabel(self, text="", image=image, bg_color=backgroundColor)
             iconLabel.grid(column=0, row=0, sticky="news")
 
-            NameFrame = ctk.CTkFrame(self, height=70, fg_color=backgroundColor)
-            NameFrame.grid(column=1, row=0, sticky="news")
-            NameFrame.rowconfigure(0, weight=14)
-            NameFrame.rowconfigure(1, weight=1)
+            self.NameFrame = ctk.CTkFrame(self, height=70, fg_color=backgroundColor)
+            self.NameFrame.grid(column=1, row=0, sticky="news")
+            self.NameFrame.rowconfigure(0, weight=14)
+            self.NameFrame.rowconfigure(1, weight=1)
 
-            nameLabel = ctk.CTkLabel(NameFrame, text=name, font=ctk.CTkFont("Ariel", size=24), anchor="sw")
+            nameLabel = ctk.CTkLabel(self.NameFrame, text=name, font=ctk.CTkFont("Ariel", size=24), anchor="sw")
             nameLabel.grid(column=0, row=0, sticky="news")
             
-            dateLabel = ctk.CTkLabel(NameFrame, text="Date", font=ctk.CTkFont("Ariel", size=12), anchor="w")
+            dateLabel = ctk.CTkLabel(self.NameFrame, text=date, font=ctk.CTkFont("Ariel", size=12), anchor="w")
             dateLabel.grid(column=0, row=1, sticky="news")
+
+            self.bind("<Button-1>", lambda event: self.selectSelf())
+            self.IconFrame.bind("<Button-1>", lambda event: selectSelf())
+            iconLabel.bind("<Button-1>", lambda event: selectSelf())
+            self.NameFrame.bind("<Button-1>", lambda event: selectSelf())
+            nameLabel.bind("<Button-1>", lambda event: selectSelf())
+            dateLabel.bind("<Button-1>", lambda event: selectSelf())
+            def selectSelf():
+                print(master.selectedCell)
+                if self.master.selectedCell != self:
+                    self.configure(fg_color="#428CD4")
+                    self.IconFrame.configure(fg_color="#428CD4")
+                    self.NameFrame.configure(fg_color="#428CD4")
+
+                    if self.master.selectedCell != None:
+                        self.master.selectedCell.configure(fg_color="#3A3B3C")
+                        self.master.selectedCell.IconFrame.configure(fg_color="#3A3B3C")
+                        self.master.selectedCell.NameFrame.configure(fg_color="#3A3B3C")
+
+                    self.master.selectedCell = self
+
 
 
 
