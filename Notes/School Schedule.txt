@@ -1,0 +1,10 @@
+School Schedule
+April 27, 2024 - 04: 51 AM
+C:/Users/Ryanr/Documents/Programming/APCT/ExampleImages/school.png
+1. Math (Period 1) - 8:00 AM - 9:40 AM
+2. English (Period 2) - 9:50 AM - 11:30 AM
+3. Science (Period 3) - 11:40 AM - 1:20 PM
+4. History (Period 4) - 1:30 PM - 3:00 PM
+Lunch Break - 3:00 PM - 3:40 PM
+5. Physical Education (Period 5) - 3:50 PM - 4:40 PM
+6. Foreign Language (Period 6) - 4:50 PM - 6:20 PM

@@ -4,6 +4,7 @@ import tkinter.messagebox as tmsg
 from PIL import Image
 import datetime
 import os
+import webbrowser
 
 class MainApp(ctk.CTk):
     def __init__(self, **kwargs):
@@ -34,7 +35,6 @@ class MainApp(ctk.CTk):
         self.mainloop()
 
     def switchEditMode(self):
-        print("Runnn")
         if self.mode == "Normal":
             if self.noteContainer.selectedCell is not None:
                 self.mode = "Edit"
@@ -49,7 +49,7 @@ class MainApp(ctk.CTk):
                 self.topBar.deleteNoteButton.unbind("<Button-1>")
         else:
             self.mode = "Normal"
-            self.ButtonBar.secondaryButton.configure(text="Settings")
+            self.ButtonBar.secondaryButton.configure(text="Settings", command=self.ButtonBar.secondaryButtonCommand)
             self.editingWidget.grid_forget()
             self.ButtonBar.actionButton.configure(text="Edit Selected Note", command=self.ButtonBar.actionButtonCommand)
             self.noteContainer.grid(row=1, column=0, sticky="news")
@@ -111,7 +111,6 @@ class MainApp(ctk.CTk):
 
         def changeIcon(self):
             newIconPath = filedialog.askopenfile().name
-            # print(newIconPath)
 
             with open(self.selectedCell.filelocation, "r") as file:
                     lines = file.readlines()
@@ -158,18 +157,32 @@ class MainApp(ctk.CTk):
         def __init__(self, master, **kwargs):
             super().__init__(master, fg_color="transparent", **kwargs)
             self.columnconfigure(0, weight=1)
-            self.columnconfigure(1, weight=1)
 
             self.master = master
+            
+            interactionButtonsFrame = ctk.CTkFrame(self)
+            interactionButtonsFrame.grid(row=0, column=0, columnspan=2, sticky="news")
+            interactionButtonsFrame.columnconfigure(0, weight=1)
+            interactionButtonsFrame.columnconfigure(1, weight=1)
+            
+            helpButtonFrame = ctk.CTkFrame(self)
+            helpButtonFrame.grid(row=1, column=0, sticky="news", pady=2)
+            helpButtonFrame.columnconfigure(0, weight=1)
 
-            self.actionButton = ctk.CTkButton(self, text="Edit Selected Note", command=lambda: self.actionButtonCommand())
+            self.actionButton = ctk.CTkButton(interactionButtonsFrame, text="Edit Selected Note", command=lambda: self.actionButtonCommand())
             self.actionButton.grid(column=0, row=0, sticky="news", padx=2)
 
-            self.secondaryButton = ctk.CTkButton(self, text="Settings", command=lambda: self.secondaryButtonCommand())
+            self.secondaryButton = ctk.CTkButton(interactionButtonsFrame, text="Settings", command=lambda: self.secondaryButtonCommand())
             self.secondaryButton.grid(column=1, row=0, sticky="news", padx=2)
+            
+            self.helpButton = ctk.CTkButton(helpButtonFrame, text="Help", command=lambda: self.helpButtonCommand())
+            self.helpButton.grid(column=0, row=0, sticky="news", padx=2)
 
+        def helpButtonCommand(self):
+            if tmsg.askyesno("Help", "Do you want to open the Instructions Page?"):
+                webbrowser.open(f"file://{os.getcwd()}/help.html")
+                
         def actionButtonCommand(self):
-            print(self.master.mode)
             if self.master.mode == "Delete":
                 if tmsg.askyesno("Delete Note", "Are you sure you want to delete this note?"):
                     self.master.noteContainer.selectedCell.deleteSelf()
@@ -178,45 +191,62 @@ class MainApp(ctk.CTk):
 
         def secondaryButtonCommand(self):
             if self.master.mode == "Edit":
-                # print("ran")
                 if self.master.isEdited:
                     if tmsg.askyesno("Unsaved File", "You have unsaved changes. Are you sure you want to close this note?"):
                         self.master.switchEditMode()
                 else:
                     self.master.switchEditMode()
+            elif self.master.mode == "Normal" or self.master.mode == "Delete":
+                popup = ctk.CTkToplevel(self)
+                currentTheme = ctk.StringVar()
+                currentTheme.set(ctk.get_appearance_mode())
+                ctk.CTkLabel(popup, text="Current Theme").pack(padx=5, pady=5)
+                
+                themeSelector = ctk.CTkOptionMenu(popup, variable=currentTheme, values=["Light", "Dark"], command=lambda new_theme: ctk.set_appearance_mode(new_theme))
+                themeSelector.pack(padx=5, pady=5)
+                
+                popup.after(100, popup.lift)
+                
+                
 
 
 
     class NoteContainer(ctk.CTkFrame):
         def __init__(self, master, cellClassRef, **kwargs):
             super().__init__(master, fg_color="transparent", **kwargs)
+            
+            def populatePathList(pathList):
+                for file in os.listdir('./Notes'):
+                    if file.endswith(".txt"):
+                        pathList.append(file)
+
+            def populateNoteContainer(noteList):
+                
+                populatePathList(noteList)
+                
+                for file in savedNotesFiles:
+                    with open(f"Notes/{file}", "r") as noteFile:
+                        name = noteFile.readline().strip()
+                        date = noteFile.readline().strip()
+                        iconPath = noteFile.readline().strip()
+                        filePath = f"Notes/{file}"
+                        self.addCell(name, iconPath, date, filePath)
 
             self.cellClassRef = cellClassRef
             self.noteIndex = 0
             self.selectedCell = None
             self.master = master
-            # self.cellList = []
 
             self.columnconfigure(0, weight=1)
 
             savedNotesFiles = []
-            for file in os.listdir('./Notes'):
-                if file.endswith(".txt"):
-                    savedNotesFiles.append(file)
 
-            for file in savedNotesFiles:
-                with open(f"Notes/{file}", "r") as noteFile:
-                    name = noteFile.readline().strip()
-                    date = noteFile.readline().strip()
-                    iconPath = noteFile.readline().strip()
-                    filePath = f"Notes/{file}"
-                    self.addCell(name, iconPath, date, filePath)
+            populateNoteContainer(savedNotesFiles)
 
         def addCell(self, name, iconPath, date, filepath=None, createFile=False):
             if filepath == None: filepath = f"Notes/{name}.txt"
             newCell = self.cellClassRef(self, name=name, icon=iconPath, date=date, filelocation=filepath)
             newCell.grid(row=self.noteIndex, column=0, sticky="news", pady=2)
-            # self.cellList.append(newCell)
             if createFile:
                 with open(f"Notes/{name}.txt", "w") as noteFile:
                     noteFile.write(f"{name}\n{date}\n{iconPath}\n")
@@ -259,8 +289,6 @@ class MainApp(ctk.CTk):
                 self.master.ButtonBar.actionButton.configure(text="Delete Selected Note")
                 self.master.mode="Delete"
                 if self.master.noteContainer.selectedCell is not None:
-                    # self.master.noteContainer.selectedCell.delete()
-                    # self.master.noteContainer.selectedCell = None
                     self.master.noteContainer.selectedCell.configure(fg_color="#8F0000")
                     self.master.noteContainer.selectedCell.IconFrame.configure(fg_color="#8F0000")
                     self.master.noteContainer.selectedCell.NameFrame.configure(fg_color="#8F0000")
@@ -282,7 +310,6 @@ class MainApp(ctk.CTk):
             self.selectedImage = "./image-not-found-icon.png"
 
             popup.columnconfigure(0, weight=1)
-            # popup.columnconfigure(1, weight=4)
             popup.rowconfigure(0, weight=2)
             popup.rowconfigure(1, weight=1)
 
@@ -354,8 +381,11 @@ class MainApp(ctk.CTk):
             self.filelocation = filelocation
             self.name = name
             backgroundColor = ("#FFFFFF", "#3A3B3C")
-
-            self.image = ctk.CTkImage(light_image=Image.open(icon), dark_image=Image.open(icon), size=(50, 50))
+            
+            try:
+                self.image = ctk.CTkImage(light_image=Image.open(icon), dark_image=Image.open(icon), size=(50, 50))
+            except:
+                self.image = ctk.CTkImage(light_image=Image.open("./image-not-found-icon.png"), dark_image=Image.open("./image-not-found-icon.png"), size=(50, 50))
 
             self.IconFrame = ctk.CTkFrame(self, width=70, height=70, fg_color="transparent")
             self.IconFrame.grid(column=0, row=0, sticky="news")
@@ -385,7 +415,6 @@ class MainApp(ctk.CTk):
 
 
             def selectSelf():
-                print(master.selectedCell)
                 if self.master.selectedCell != self:
                     if self.master.master.mode == "Delete":
                         self.configure(fg_color="#8F0000")
@@ -407,8 +436,5 @@ class MainApp(ctk.CTk):
             self.master.selectedCell = None
             os.remove(self.filelocation)
             self.destroy()
-
-
-
-
+            
 MainApp()
